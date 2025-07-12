@@ -29,7 +29,6 @@ void warning(char *message);
 
 // Sudoku functions
 void printSudoku(int **matrix);
-int randomValue();
 int *randomArray();
 void fillDiagonalSectors(int **matrix);
 bool fillSudoku(int **matrix, int row, int col);
@@ -57,6 +56,7 @@ int main() {
   }
 
   fillDiagonalSectors(matrix);
+  fillSudoku(matrix, 0, 0);
   printSudoku(matrix);
 
   free(matrix);
@@ -75,9 +75,9 @@ void warning(char *message) {
 
 // Print sudoku matrix with styling and colors
 void printSudoku(int **matrix) {
-  for (int i = 0; i < SUDOKU_SIZE; i++) {
-    for (int j = 0; j < SUDOKU_SIZE; j++) {
-      int value = matrix[j][i];
+  for (int row = 0; row < SUDOKU_SIZE; row++) {
+    for (int col = 0; col < SUDOKU_SIZE; col++) {
+      int value = matrix[row][col];
       switch (value) {
       case 1:
         printf(FONT_1 "%d " ANSI_COLOR_RESET, value);
@@ -109,20 +109,15 @@ void printSudoku(int **matrix) {
       default:
         printf("%d ", value);
       }
-      if ((j + 1) % SECTOR_SIZE == 0) {
+      if ((col + 1) % SECTOR_SIZE == 0) {
         printf(" ");
       }
     }
     printf("\n");
-    if ((i + 1) % SECTOR_SIZE == 0 && i + 1 != SUDOKU_SIZE) {
+    if ((row + 1) % SECTOR_SIZE == 0 && row + 1 != SUDOKU_SIZE) {
       printf("\n");
     }
   }
-}
-
-// Generate random value for sudoku
-int randomValue() {
-  return (rand() % MAX_VALUE) + 1;
 }
 
 // Generate shuffled array with sudoku values
@@ -146,14 +141,14 @@ int *randomArray() {
 }
 
 // Determine if move is legal in the row
-bool isLegalHorizontal(int **matrix, int value, int rowIndex) {
+bool isLegalHorizontal(int **matrix, int value, int row) {
   if (value < 1 || value > MAX_VALUE) {
     error("Value out of range");
     return false;
   }
 
   for (int i = 0; i < SUDOKU_SIZE; i++) {
-    if (matrix[rowIndex][i] == value) {
+    if (matrix[row][i] == value) {
       warning("Value found in the row. Move is illegal.");
       return false;
     }
@@ -163,14 +158,14 @@ bool isLegalHorizontal(int **matrix, int value, int rowIndex) {
 }
 
 // Determine if move is legal in the column
-bool isLegalVertical(int **matrix, int value, int columnIndex) {
+bool isLegalVertical(int **matrix, int value, int col) {
   if (value < 1 || value > MAX_VALUE) {
     error("Value out of range");
     return false;
   }
 
   for (int i = 0; i < SUDOKU_SIZE; i++) {
-    if (matrix[i][columnIndex] == value) {
+    if (matrix[i][col] == value) {
       warning("Value found in the column. Move is illegal.");
       return false;
     }
@@ -191,12 +186,12 @@ bool isLegalSector(int **matrix, int value, int sector) {
   }
 
   // Coordinates of top left sector corner
-  int sx = sector % 3 * SECTOR_SIZE;
-  int sy = sector / 3 * SECTOR_SIZE;
+  int col = sector % 3 * SECTOR_SIZE;
+  int row = sector / 3 * SECTOR_SIZE;
 
   // Loop through the sector
-  for (int y = sy; y < sy + SECTOR_SIZE; y++) {
-    for (int x = sx; x < sx + SECTOR_SIZE; x++) {
+  for (int y = row; y < row + SECTOR_SIZE; y++) {
+    for (int x = col; x < col + SECTOR_SIZE; x++) {
       if (matrix[y][x] == value) {
         warning("Value found in the sector. Move is illegal.");
         return false;
@@ -208,14 +203,18 @@ bool isLegalSector(int **matrix, int value, int sector) {
 }
 
 // Find all legal values in provided coordinates
-bool *possibleValues(int **matrix, int x, int y) {
+bool *possibleValues(int **matrix, int row, int col) {
   // Create 9 element array
   bool *array = (bool *)malloc(MAX_VALUE * sizeof(bool));
 
   // Check each value if it is legal
   for (int i = 0; i < MAX_VALUE; i++) {
-    array[i] = isLegalHorizontal(matrix, i + 1, y) && isLegalVertical(matrix, i + 1, x) && isLegalSector(matrix, i + 1, (x / 3) * 3 + (y / 3));
+    array[i] = isLegalHorizontal(matrix, i + 1, row) && isLegalVertical(matrix, i + 1, col) && isLegalSector(matrix, i + 1, (row / 3) * 3 + (col / 3));
   }
+
+  // for (int i = 0; i < MAX_VALUE; i++) {
+  //   printf("%d: %d\n", i + 1, array[i]);
+  // }
 
   return array;
 }
@@ -235,7 +234,39 @@ void fillDiagonalSectors(int **matrix) {
   }
 }
 
-// NAIVE APPROACH
+bool fillSudoku(int **matrix, int row, int col) {
+  // End of sudoku
+  if (row == 9) {
+    return true;
+  }
+
+  // End of row, go to next one
+  if (col == 9) {
+    return fillSudoku(matrix, row + 1, 0);
+  }
+
+  // Skip if cell is already filled
+  if (matrix[row][col] != 0) {
+    return fillSudoku(matrix, row, col + 1);
+  }
+
+  // Generate possible values
+  bool *parr = possibleValues(matrix, row, col);
+  // Recursively try all possible values
+  for (int i = 0; i < MAX_VALUE; i++) {
+    if (parr[i]) {
+      matrix[row][col] = i + 1;
+      if (fillSudoku(matrix, row, col + 1)) {
+        return true;
+      }
+      matrix[row][col] = 0;
+    }
+  }
+
+  return false;
+}
+
+// NAIVE APPROACH - not working btw
 // Generate sudoku
 void generateSudoku(int **matrix) {
   // STAGE 1: Fill diagonal sectors with random values
