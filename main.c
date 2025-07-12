@@ -31,6 +31,8 @@ void warning(char *message);
 void printSudoku(int **matrix);
 int randomValue();
 int *randomArray();
+void fillDiagonalSectors(int **matrix);
+bool fillSudoku(int **matrix, int row, int col);
 void generateSudoku(int **matrix);
 bool isLegalVertical(int **matrix, int value, int columnIndex);
 bool isLegalHorizontal(int **matrix, int value, int rowIndex);
@@ -54,9 +56,7 @@ int main() {
     }
   }
 
-  generateSudoku(matrix);
-
-  possibleValues(matrix, 3, 0);
+  fillDiagonalSectors(matrix);
   printSudoku(matrix);
 
   free(matrix);
@@ -77,7 +77,7 @@ void warning(char *message) {
 void printSudoku(int **matrix) {
   for (int i = 0; i < SUDOKU_SIZE; i++) {
     for (int j = 0; j < SUDOKU_SIZE; j++) {
-      int value = matrix[i][j];
+      int value = matrix[j][i];
       switch (value) {
       case 1:
         printf(FONT_1 "%d " ANSI_COLOR_RESET, value);
@@ -214,12 +214,28 @@ bool *possibleValues(int **matrix, int x, int y) {
 
   // Check each value if it is legal
   for (int i = 0; i < MAX_VALUE; i++) {
-    array[i] = isLegalHorizontal(matrix, i + 1, y) && isLegalVertical(matrix, i + 1, x) && isLegalSector(matrix, i + 1, (x / 3) + (y / 3));
+    array[i] = isLegalHorizontal(matrix, i + 1, y) && isLegalVertical(matrix, i + 1, x) && isLegalSector(matrix, i + 1, (x / 3) * 3 + (y / 3));
   }
 
   return array;
 }
 
+// Fill diagonal sectors with random values
+void fillDiagonalSectors(int **matrix) {
+  for (int n = 0; n < SECTOR_SIZE; n++) {
+    // Random array
+    int *rarr = randomArray();
+    // Fill sector with random not repeating values
+    for (int i = 0; i < SECTOR_SIZE; i++) {
+      for (int j = 0; j < SECTOR_SIZE; j++) {
+        matrix[i + (n * SECTOR_SIZE)][j + (n * SECTOR_SIZE)] = rarr[(i * SECTOR_SIZE) + j];
+      }
+    }
+    free(rarr);
+  }
+}
+
+// NAIVE APPROACH
 // Generate sudoku
 void generateSudoku(int **matrix) {
   // STAGE 1: Fill diagonal sectors with random values
@@ -238,18 +254,38 @@ void generateSudoku(int **matrix) {
   // STAGE 2: Recursively fill remaining values
   int index = 0;
   while (index < (SUDOKU_SIZE * SUDOKU_SIZE)) {
-    int x = index / SUDOKU_SIZE;
-    int y = index % SUDOKU_SIZE;
+    int row = index / SUDOKU_SIZE;
+    int col = index % SUDOKU_SIZE;
 
-    // if value is filled skip it
-    if (matrix[x][y] != 0) {
+    // If value is empty find a solution
+    if (matrix[row][col] == 0) {
+      bool *parr = possibleValues(matrix, index / 9, index % 9);
+      int value = -1;
+
+      // if value is possible swap it (50% chance)
+      for (int i = 0; i < MAX_VALUE; i++) {
+        if (parr[i] == true) {
+          if (value < 0) {
+            value = i + 1;
+          } else if (rand() % 2 == 0) {
+            value = i + 1;
+          }
+        }
+      }
+
+      // if no value is possible decrease index and try again
+      if (value < 0) {
+        index -= 1;
+        matrix[row][col] = 0;
+        error("No legal move is possible.");
+      } else {
+        matrix[row][col] = value;
+        printSudoku(matrix);
+
+        index++;
+      }
+    } else {
       index++;
-      continue;
     }
-
-    // printf("x: %d, y: %d\n", x, y);
-    // int *arr = possibleValues(matrix, x, y);
-
-    index++;
   }
 }
