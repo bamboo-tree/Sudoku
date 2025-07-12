@@ -1,7 +1,5 @@
 # 🧩 Sudoku Generator
 
-![sudoku-preview](screenshot.png)
-
 ## 🎯 Project Goal
 
 This project is a **Sudoku board generator** written in C. Its goal is to generate a complete, valid 9x9 Sudoku grid using the **backtracking algorithm**. Each time the program runs, it produces a fully randomized, correct Sudoku board.
