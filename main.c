@@ -17,24 +17,23 @@
 #define FONT_9 "\e[38;2;147;54;253m"
 #define ANSI_COLOR_RESET "\x1b[0m"
 
+#define SHUFFLE_CYCLES 30
 // Sudoku definition - classic 9x9
 #define SUDOKU_SIZE 9
 #define SECTOR_SIZE 3
 #define MAX_VALUE 9
-#define SHUFFLE_CYCLES 30
 
 // Log functions
 void error(char *message);
 void warning(char *message);
-
 // Sudoku functions
-void printSudoku(int **matrix);
-int *randomArray();
 void fillDiagonalSectors(int **matrix);
 bool fillSudoku(int **matrix, int row, int col);
-void generateSudoku(int **matrix);
-bool isLegalVertical(int **matrix, int value, int columnIndex);
-bool isLegalHorizontal(int **matrix, int value, int rowIndex);
+int *randomArray();
+void printSudoku(int **matrix);
+// Validation functions
+bool isLegalVertical(int **matrix, int value, int col);
+bool isLegalHorizontal(int **matrix, int value, int row);
 bool isLegalSector(int **matrix, int value, int sector);
 bool *possibleValues(int **matrix, int x, int y);
 
@@ -48,15 +47,11 @@ int main() {
     matrix[i] = malloc(SUDOKU_SIZE * sizeof(int));
   }
 
-  // fill with 0 - delete later
-  for (int i = 0; i < SUDOKU_SIZE; i++) {
-    for (int j = 0; j < SUDOKU_SIZE; j++) {
-      matrix[i][j] = 0;
-    }
-  }
-
+  // Stage 1 - randomly fill diagonal sectors with legal values, these sectors don't interact with each other
   fillDiagonalSectors(matrix);
+  // Stage 2 - recursively fill remaining cells with legal values
   fillSudoku(matrix, 0, 0);
+  // Stage 3 - print generated sudoku matrix :)
   printSudoku(matrix);
 
   free(matrix);
@@ -65,12 +60,12 @@ int main() {
 
 // Quick error log function
 void error(char *message) {
-  printf(FONT_ERROR "ERROR: %s\n" ANSI_COLOR_RESET, message);
+  // printf(FONT_ERROR "ERROR: %s\n" ANSI_COLOR_RESET, message);
 }
 
 // Quick warning log function
 void warning(char *message) {
-  printf(FONT_WARNING "WARNING: %s\n" ANSI_COLOR_RESET, message);
+  // printf(FONT_WARNING "WARNING: %s\n" ANSI_COLOR_RESET, message);
 }
 
 // Print sudoku matrix with styling and colors
@@ -78,6 +73,7 @@ void printSudoku(int **matrix) {
   for (int row = 0; row < SUDOKU_SIZE; row++) {
     for (int col = 0; col < SUDOKU_SIZE; col++) {
       int value = matrix[row][col];
+
       switch (value) {
       case 1:
         printf(FONT_1 "%d " ANSI_COLOR_RESET, value);
@@ -109,11 +105,13 @@ void printSudoku(int **matrix) {
       default:
         printf("%d ", value);
       }
+      // Space between sectors
       if ((col + 1) % SECTOR_SIZE == 0) {
         printf(" ");
       }
     }
     printf("\n");
+    // Space between sectors
     if ((row + 1) % SECTOR_SIZE == 0 && row + 1 != SUDOKU_SIZE) {
       printf("\n");
     }
@@ -127,7 +125,6 @@ int *randomArray() {
   for (int i = 0; i < MAX_VALUE; i++) {
     array[i] = i + 1;
   }
-
   // Shuffle values
   int index = 0;
   for (int i = 0; i < SHUFFLE_CYCLES; i++) {
@@ -146,6 +143,10 @@ bool isLegalHorizontal(int **matrix, int value, int row) {
     error("Value out of range");
     return false;
   }
+  if (row < 0 || row > SUDOKU_SIZE) {
+    error("Row index out of range");
+    return false;
+  }
 
   for (int i = 0; i < SUDOKU_SIZE; i++) {
     if (matrix[row][i] == value) {
@@ -161,6 +162,10 @@ bool isLegalHorizontal(int **matrix, int value, int row) {
 bool isLegalVertical(int **matrix, int value, int col) {
   if (value < 1 || value > MAX_VALUE) {
     error("Value out of range");
+    return false;
+  }
+  if (col < 0 || col > SUDOKU_SIZE) {
+    error("Column index out of range");
     return false;
   }
 
@@ -188,7 +193,6 @@ bool isLegalSector(int **matrix, int value, int sector) {
   // Coordinates of top left sector corner
   int col = sector % 3 * SECTOR_SIZE;
   int row = sector / 3 * SECTOR_SIZE;
-
   // Loop through the sector
   for (int y = row; y < row + SECTOR_SIZE; y++) {
     for (int x = col; x < col + SECTOR_SIZE; x++) {
@@ -211,10 +215,6 @@ bool *possibleValues(int **matrix, int row, int col) {
   for (int i = 0; i < MAX_VALUE; i++) {
     array[i] = isLegalHorizontal(matrix, i + 1, row) && isLegalVertical(matrix, i + 1, col) && isLegalSector(matrix, i + 1, (row / 3) * 3 + (col / 3));
   }
-
-  // for (int i = 0; i < MAX_VALUE; i++) {
-  //   printf("%d: %d\n", i + 1, array[i]);
-  // }
 
   return array;
 }
@@ -239,12 +239,10 @@ bool fillSudoku(int **matrix, int row, int col) {
   if (row == 9) {
     return true;
   }
-
   // End of row, go to next one
   if (col == 9) {
     return fillSudoku(matrix, row + 1, 0);
   }
-
   // Skip if cell is already filled
   if (matrix[row][col] != 0) {
     return fillSudoku(matrix, row, col + 1);
@@ -262,61 +260,7 @@ bool fillSudoku(int **matrix, int row, int col) {
       matrix[row][col] = 0;
     }
   }
+  free(parr);
 
   return false;
-}
-
-// NAIVE APPROACH - not working btw
-// Generate sudoku
-void generateSudoku(int **matrix) {
-  // STAGE 1: Fill diagonal sectors with random values
-  for (int n = 0; n < SECTOR_SIZE; n++) {
-    // Random array
-    int *rarr = randomArray();
-    // Fill sector with random not repeating values
-    for (int i = 0; i < SECTOR_SIZE; i++) {
-      for (int j = 0; j < SECTOR_SIZE; j++) {
-        matrix[i + (n * SECTOR_SIZE)][j + (n * SECTOR_SIZE)] = rarr[(i * SECTOR_SIZE) + j];
-      }
-    }
-    free(rarr);
-  }
-
-  // STAGE 2: Recursively fill remaining values
-  int index = 0;
-  while (index < (SUDOKU_SIZE * SUDOKU_SIZE)) {
-    int row = index / SUDOKU_SIZE;
-    int col = index % SUDOKU_SIZE;
-
-    // If value is empty find a solution
-    if (matrix[row][col] == 0) {
-      bool *parr = possibleValues(matrix, index / 9, index % 9);
-      int value = -1;
-
-      // if value is possible swap it (50% chance)
-      for (int i = 0; i < MAX_VALUE; i++) {
-        if (parr[i] == true) {
-          if (value < 0) {
-            value = i + 1;
-          } else if (rand() % 2 == 0) {
-            value = i + 1;
-          }
-        }
-      }
-
-      // if no value is possible decrease index and try again
-      if (value < 0) {
-        index -= 1;
-        matrix[row][col] = 0;
-        error("No legal move is possible.");
-      } else {
-        matrix[row][col] = value;
-        printSudoku(matrix);
-
-        index++;
-      }
-    } else {
-      index++;
-    }
-  }
 }
